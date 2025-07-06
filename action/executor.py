@@ -2,6 +2,7 @@ import os
 import json
 import time
 import asyncio
+import math
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, List, Optional
@@ -17,7 +18,8 @@ SAFE_BUILTINS = {
         'ValueError': ValueError, 'TypeError': TypeError, 'KeyError': KeyError,
         'IndexError': IndexError, 'FileNotFoundError': FileNotFoundError,
         'Exception': Exception, 'min': min, 'max': max, 'sum': sum,
-        'open': open, 'json': json, 'os': os, 'Path': Path
+        'open': open, 'json': json, 'os': os, 'Path': Path,
+        'ord': ord, 'math': math
     }
 }
 

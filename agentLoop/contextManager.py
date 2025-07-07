@@ -149,10 +149,19 @@ class ExecutionContextManager:
                 
                 enhanced_code = globals_injection + code
                 
+                # Format code correctly for run_user_code - it expects a dict with code_variants
+                code_data = {
+                    "code_variants": {
+                        code_key: enhanced_code
+                    }
+                }
+                
                 result = await run_user_code(
-                    enhanced_code,
+                    code_data,
                     self.multi_mcp if hasattr(self, 'multi_mcp') else None,
-                    self.plan_graph.graph['session_id']
+                    self.plan_graph.graph['session_id'],
+                    globals_schema,  # Pass globals_schema for variable access
+                    inputs=None       # No additional inputs needed
                 )
                 
                 if result.get("status") == "success":
@@ -170,19 +179,38 @@ class ExecutionContextManager:
             return original_output
         
         enhanced_output = original_output.copy()
-        enhanced_output["execution_result"] = execution_result.get("result")
+        
+        # Handle nested result structure from executor
+        actual_result = None
+        
+        # First check if result is directly available
+        if "result" in execution_result:
+            actual_result = execution_result.get("result")
+        # Then check if it's in code_results (nested structure from executor)
+        elif "code_results" in execution_result and isinstance(execution_result["code_results"], dict):
+            code_results = execution_result["code_results"]
+            if "result" in code_results:
+                actual_result = code_results.get("result")
+        
+        # Store execution metadata
+        enhanced_output["execution_result"] = actual_result
         enhanced_output["execution_status"] = execution_result.get("status")
         enhanced_output["execution_error"] = execution_result.get("error") 
         enhanced_output["execution_time"] = execution_result.get("execution_time")
-        enhanced_output["executed_variant"] = execution_result.get("executed_variant")
+        enhanced_output["executed_variant"] = execution_result.get("executed_variant") or execution_result.get("code_results", {}).get("successful_variant")
+        
+        # Store traceback if available
+        if "traceback" in execution_result:
+            enhanced_output["traceback"] = execution_result["traceback"]
+        elif "code_results" in execution_result and isinstance(execution_result["code_results"], dict):
+            if "traceback" in execution_result["code_results"]:
+                enhanced_output["traceback"] = execution_result["code_results"]["traceback"]
         
         # Merge execution results directly
-        if execution_result.get("status") == "success":
-            result_data = execution_result.get("result", {})
-            if isinstance(result_data, dict):
-                for key, value in result_data.items():
-                    if key not in enhanced_output:
-                        enhanced_output[key] = value
+        if execution_result.get("status") == "success" and actual_result and isinstance(actual_result, dict):
+            for key, value in actual_result.items():
+                if key not in enhanced_output:
+                    enhanced_output[key] = value
         
         return enhanced_output
     

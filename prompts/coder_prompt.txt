@@ -81,6 +81,7 @@ Return **one variant only** when:
 - Every block must end with a `return { ... }` containing named outputs
 - All output variables must end with `_XA`, `_XB`, or `_XC` depending on variant and step
 - Access prior step variables directly (e.g., `if html_layout_1A:`), never via `globals_schema.get(...)`
+- Always check and handle input variables that might be lists or contain nested data - extract the actual values before using them in functions like math.exp() that expect single values
 
 ---
 

@@ -19,7 +19,8 @@ SAFE_BUILTINS = {
         'IndexError': IndexError, 'FileNotFoundError': FileNotFoundError,
         'Exception': Exception, 'min': min, 'max': max, 'sum': sum,
         'open': open, 'json': json, 'os': os, 'Path': Path,
-        'ord': ord, 'math': math
+        'ord': ord, 'math': math,
+        '__import__': __import__  # Add __import__ to allow import statements
     }
 }
 
@@ -183,12 +184,19 @@ async def execute_python_code_variant(code: str, multi_mcp, session_id: str, glo
         }
         
     except Exception as e:
+        # Capture full traceback for detailed error reporting
+        tb_str = traceback.format_exc()
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        print(f"❌ Code execution error: {error_msg}")
+        print(f"📋 Traceback:\n{tb_str}")
+        
         return {
             "status": "failed",
             "result": {},
             "created_files": [],
             "execution_time": time.perf_counter() - start_time,
-            "error": f"{type(e).__name__}: {str(e)}"
+            "error": error_msg,
+            "traceback": tb_str
         }
 
 async def execute_code_variants(code_variants: dict, multi_mcp, session_id: str, globals_schema: dict = None, inputs: dict = None) -> dict:
@@ -203,6 +211,7 @@ async def execute_code_variants(code_variants: dict, multi_mcp, session_id: str,
     log_step(f"🐍 Executing {len(sorted_variants)} Python code variants", symbol="🧪")
     
     all_errors = []
+    last_traceback = None  # Store the last traceback
     
     for variant_name, code in sorted_variants:
         log_step(f"⚡ Trying {variant_name}", symbol="🔬")
@@ -222,9 +231,15 @@ async def execute_code_variants(code_variants: dict, multi_mcp, session_id: str,
             error_msg = f"{variant_name}: {result['error']}"
             all_errors.append(error_msg)
             log_step(f"❌ {variant_name} failed: {result['error']}", symbol="🚨")
+            
+            # Store the traceback from this failed variant
+            if result.get("traceback"):
+                last_traceback = result["traceback"]
+                log_step(f"📋 Captured traceback for {variant_name}", symbol="🔍")
     
     # All variants failed
     log_step(f"💀 All {len(sorted_variants)} variants failed", symbol="❌")
+    
     return {
         "status": "failed",
         "result": {},
@@ -232,7 +247,8 @@ async def execute_code_variants(code_variants: dict, multi_mcp, session_id: str,
         "execution_time": time.perf_counter() - start_time,
         "error": f"All code variants failed. Errors: {'; '.join(all_errors)}",
         "failed_variants": len(sorted_variants),
-        "all_errors": all_errors
+        "all_errors": all_errors,
+        "traceback": last_traceback  # Include the traceback from the last failed variant
     }
 
 async def run_user_code(output_data: dict, multi_mcp, session_id: str = "default_session", globals_schema: dict = None, inputs: dict = None) -> dict:
